@@ -668,7 +668,7 @@ function legacyGame(g){
   const {status,...rest}=g;
   return {...rest,progress:['2025','2026','earlier'].includes(status)?'completed':'unknown',historyGroup:['2025','2026','earlier'].includes(status)?status:null,owned:g.owned,legacyUnowned:status==='unowned',kind:'unknown',parentId:null,steamAppId:null};
 }
-function displayStatus(g){return g.progress==='completed'?(g.historyGroup??'earlier'):g.owned==='no'||g.legacyUnowned?'unowned':'unknown'}
+function displayStatus(g){return g.progress==='completed'?(g.historyGroup??'earlier'):g.owned==='no'||(g.owned==='unknown'&&g.legacyUnowned)?'unowned':'unknown'}
 function migrateData(raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('Некорректный формат данных');
   const version=Object.hasOwn(raw,'version')?raw.version:0;
@@ -705,8 +705,15 @@ function validateData(v){
     if(typeof g.date!=='string'||(g.date&&(!/^\d{4}-\d{2}-\d{2}$/.test(g.date)||!Number.isFinite(Date.parse(g.date))||new Date(g.date).toISOString().slice(0,10)!==g.date)))fail('date');
     if(g.order!==null&&(!Number.isSafeInteger(g.order)||g.order<1))fail('order');
     if(g.note!==undefined&&typeof g.note!=='string')fail('note');
+    if(g.parentId!==null&&g.kind!=='dlc')fail('parentId');
     return {...g,note:g.note??''};
   });
+  const byId=new Map(games.map(g=>[g.id,g]));
+  const steamIds=new Set();
+  for(const g of games){
+    if(g.parentId!==null){const parent=byId.get(g.parentId);if(!parent||parent.kind==='dlc')fail('parentId')}
+    if(g.steamAppId!==null){if(steamIds.has(g.steamAppId))fail('steamAppId');steamIds.add(g.steamAppId)}
+  }
   if(!one(v.mode,['story','extra','all']))fail('mode');
   if(!one(v.quick,['all','short','switch','series','oled','pc3','cozy']))fail('quick');
   if(!Array.isArray(v.moods)||v.moods.length>5||!v.moods.every(m=>MOODS.includes(m))||new Set(v.moods).size!==v.moods.length)fail('moods');
@@ -718,12 +725,13 @@ function mergeCatalog(games,base=BASE.map(legacyGame)){
   const ids=new Set(games.map(g=>g.id));
   return [...games,...base.filter(g=>!ids.has(g.id)).map(g=>({...g}))];
 }
-const STORAGE_KEY='gamecompass-v1';
+const STORAGE_KEY='gamecompass-v2';
+const LEGACY_STORAGE_KEY='gamecompass-v1';
 let state={version:DATA_VERSION,games:BASE.map(legacyGame),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
 let storageBlocked=false;
 function loadSaved(){
   try{
-    const raw=localStorage.getItem(STORAGE_KEY);
+    const raw=localStorage.getItem(STORAGE_KEY)??localStorage.getItem(LEGACY_STORAGE_KEY);
     if(raw===null)return;
     const saved=migrateData(JSON.parse(raw));
     state={...saved,games:mergeCatalog(saved.games)};
@@ -749,7 +757,7 @@ function updateSettings(patch){
 }
 function setMode(mode){if(updateSettings({mode})){renderTimeMode();renderHome();renderCatalog()}}
 function setQuick(quick){if(updateSettings({quick}))renderHome()}
-function done(g){return g.progress==='completed'}function h(g){if(!g.hours)return 0;return Math.round(g.hours*(state.mode==='story'?.65:state.mode==='all'?1.8:1))}function owned(g){return g.owned!=='no'&&!g.legacyUnowned}
+function done(g){return g.progress==='completed'}function h(g){if(!g.hours)return 0;return Math.round(g.hours*(state.mode==='story'?.65:state.mode==='all'?1.8:1))}function owned(g){return g.owned!=='no'&&!(g.owned==='unknown'&&g.legacyUnowned)}
 function badge(g){return `<span class="pill ${done(g)?'green':!owned(g)?'orange':g.screen==='oled'||g.screen==='pc3'?'blue':''}">${esc(STATUS[displayStatus(g)])}</span>`}
 function seriesNext(g){const s=state.games.filter(x=>x.series&&x.series===g.series).sort((a,b)=>a.id-b.id);const idx=s.findIndex(x=>x.id===g.id);return idx>=0?s[idx+1]:null}
 function lastPlayed(){return state.games.filter(done).sort((a,b)=>{if(a.date&&b.date)return b.date.localeCompare(a.date);if(a.date)return -1;if(b.date)return 1;if(a.order&&b.order)return b.order-a.order;if(a.order)return -1;if(b.order)return 1;return 0})}
@@ -767,15 +775,14 @@ function pool(){return state.games.filter(g=>(!$('ownedOnly').checked||owned(g))
 function recommend(){let items=pool().sort((a,b)=>moodScore(b)-moodScore(a)).slice(0,3);$('pickerResult').innerHTML='<div class="divider"></div><h3>Три варианта</h3>'+items.map(g=>gameCard(g)).join('')+(items.length?'':'<div class="empty">Нет подходящих игр</div>')}
 function randomize(fromHome=false){let items=fromHome?recList().filter(x=>!['oled','pc3'].includes(x.g.screen)).map(x=>x.g):pool();if(!items.length){alert('Нет подходящих игр. Измени фильтры.');return}let bytes=new Uint32Array(1);crypto.getRandomValues(bytes);let g=items[bytes[0]%items.length];if(fromHome){openGame(g.id)}else $('pickerResult').innerHTML='<div class="divider"></div><div class="eyebrow">🎲 Случайный выбор</div>'+gameCard(g)}
 function performance(g){if(g.screen==='console')return 'Нет нативной версии Windows; производительность ПК1 неприменима.';if(g.screen==='pc3')return 'Требовательная игра: лучше дождаться ПК3. RTX 3080 может потребовать DLSS, снижения RT и настроек, особенно в 4K.';if(g.screen==='oled')return 'Лучше смотреть на OLED ради контраста и тёмных сцен. На RTX 3080 разумно ориентироваться на 1440p или 4K с DLSS/снижением настроек.';if(['Starfield','Dragon’s Dogma 2','Baldur’s Gate 3','Lords of the Fallen'].includes(g.name))return 'Возможны просадки и ограничения CPU/VRAM. Рекомендуется 1440p с настройкой графики.';return 'Предварительный прогноз: комфортный 1440p, часто возможен 4K с настройками. Точные FPS и 1% low не измерены.'}
-function openGame(id){let g=state.games.find(x=>x.id===id);if(!g)return;let next=seriesNext(g);$('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="row"><div class="eyebrow">Карточка игры #${g.id}</div><button class="btn tiny" onclick="closeModal()">✕ Закрыть</button></div><div class="big">${esc(g.name)}</div><div class="pills">${badge(g)}<span class="pill">${esc(GENRES[g.genre])}</span><span class="pill blue">${esc(SCREENS[g.screen])}</span></div><div class="grid3" style="margin-top:12px"><div class="stat"><strong>${g.hours?Math.round(g.hours*.65):'?'}</strong><span>Сюжет · ч</span></div><div class="stat"><strong>${g.hours||'?'}</strong><span>С допами · ч</span></div><div class="stat"><strong>${g.hours?Math.round(g.hours*1.8):'?'}</strong><span>100% · ч</span></div></div><p class="hint">Часы ориентировочные, не верифицированы по каждой игре. 100% — приблизительная оценка, не гарантия получения всех достижений.</p><div class="divider"></div><b>ПК1 · Ryzen 5600X / RTX 3080</b><p class="desc">${performance(g)}</p><b>Экран и управление</b><p class="desc">${esc(SCREENS[g.screen])} · ${g.control==='pad'?'DualShock 4 (альтернатива Xbox Elite Series 2)':'Клавиатура + мышь; для дивана можно Xbox Elite Series 2'}.</p>${next?`<p class="hint">Следующая часть: <b>${esc(next.name)}</b>.</p>`:''}<div class="divider"></div><div class="grid2"><div><label class="label">Прохождение</label><select class="input" id="editStatus"><option value="unknown">Не уточнён</option><option value="2025">Пройдена в 2025</option><option value="2026">Пройдена в 2026</option><option value="earlier">Пройдена ранее</option><option value="unowned">Не куплена</option></select></div><div><label class="label">Владение</label><select class="input" id="editOwned"><option value="unknown">Не проверено</option><option value="yes">Куплена / есть доступ</option><option value="no">Не куплена</option></select></div></div><label class="label">Фактическая дата завершения (может отличаться от группы)</label><input class="input" id="editDate" type="date" value="${esc(g.date)}"><label class="label">Порядок прохождения (число, если дата неизвестна)</label><input class="input" id="editOrder" type="number" min="1" placeholder="Например: 12" value="${g.order??''}"><label class="label">Заметка</label><input class="input" id="editNote" placeholder="Например: хочу перепройти на OLED" value="${esc(g.note||'')}"><div class="flex" style="margin-top:13px"><button class="btn primary" onclick="saveGame(${g.id})">Сохранить</button><button class="btn" onclick="closeModal()">Отмена</button></div></div></div>`;$('editStatus').value=displayStatus(g);$('editOwned').value=g.owned}
+function openGame(id){let g=state.games.find(x=>x.id===id);if(!g)return;let next=seriesNext(g);$('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="row"><div class="eyebrow">Карточка игры #${g.id}</div><button class="btn tiny" onclick="closeModal()">✕ Закрыть</button></div><div class="big">${esc(g.name)}</div><div class="pills">${badge(g)}<span class="pill">${esc(GENRES[g.genre])}</span><span class="pill blue">${esc(SCREENS[g.screen])}</span></div><div class="grid3" style="margin-top:12px"><div class="stat"><strong>${g.hours?Math.round(g.hours*.65):'?'}</strong><span>Сюжет · ч</span></div><div class="stat"><strong>${g.hours||'?'}</strong><span>С допами · ч</span></div><div class="stat"><strong>${g.hours?Math.round(g.hours*1.8):'?'}</strong><span>100% · ч</span></div></div><p class="hint">Часы ориентировочные, не верифицированы по каждой игре. 100% — приблизительная оценка, не гарантия получения всех достижений.</p><div class="divider"></div><b>ПК1 · Ryzen 5600X / RTX 3080</b><p class="desc">${performance(g)}</p><b>Экран и управление</b><p class="desc">${esc(SCREENS[g.screen])} · ${g.control==='pad'?'DualShock 4 (альтернатива Xbox Elite Series 2)':'Клавиатура + мышь; для дивана можно Xbox Elite Series 2'}.</p>${next?`<p class="hint">Следующая часть: <b>${esc(next.name)}</b>.</p>`:''}<div class="divider"></div><div class="grid2"><div><label class="label">Прохождение</label><select class="input" id="editStatus"><option value="unknown">Не уточнён</option><option value="2025">Пройдена в 2025</option><option value="2026">Пройдена в 2026</option><option value="earlier">Пройдена ранее</option><option value="not_started">Не начата</option><option value="in_progress">В процессе</option></select></div><div><label class="label">Владение</label><select class="input" id="editOwned"><option value="unknown">Не проверено</option><option value="yes">Куплена / есть доступ</option><option value="no">Не куплена</option></select></div></div><label class="label">Фактическая дата завершения (может отличаться от группы)</label><input class="input" id="editDate" type="date" value="${esc(g.date)}"><label class="label">Порядок прохождения (число, если дата неизвестна)</label><input class="input" id="editOrder" type="number" min="1" placeholder="Например: 12" value="${g.order??''}"><label class="label">Заметка</label><input class="input" id="editNote" placeholder="Например: хочу перепройти на OLED" value="${esc(g.note||'')}"><div class="flex" style="margin-top:13px"><button class="btn primary" onclick="saveGame(${g.id})">Сохранить</button><button class="btn" onclick="closeModal()">Отмена</button></div></div></div>`;$('editStatus').value=g.progress==='completed'?(g.historyGroup??'earlier'):g.progress;$('editOwned').value=g.owned}
 function saveGame(id){
   const g=state.games.find(x=>x.id===id);
   if(!g)return;
   const selected=$('editStatus').value;
-  if(!Object.hasOwn(STATUS,selected)){alert('Некорректный статус');return}
+  if(!['unknown','not_started','in_progress','2025','2026','earlier'].includes(selected)){alert('Некорректный статус');return}
   const completed=['2025','2026','earlier'].includes(selected);
-  const edited={...g,progress:completed?'completed':selected===displayStatus(g)?g.progress:'unknown',historyGroup:completed?selected:null,legacyUnowned:selected==='unowned'&&$('editOwned').value!=='yes',owned:$('editOwned').value,date:$('editDate').value,order:$('editOrder').value?Number($('editOrder').value):null,note:$('editNote').value};
-  if(selected==='unowned'&&edited.owned!=='yes')edited.owned='no';
+  const edited={...g,progress:completed?'completed':selected,historyGroup:completed?selected:null,legacyUnowned:$('editOwned').value==='unknown'&&g.owned==='unknown'&&g.legacyUnowned,owned:$('editOwned').value,date:$('editDate').value,order:$('editOrder').value?Number($('editOrder').value):null,note:$('editNote').value};
   try{
     const candidate=migrateData({...state,games:state.games.map(x=>x.id===id?edited:x)});
     persist(candidate);
@@ -805,7 +812,7 @@ async function importJSON(e){
   closeModal();
   renderAll();
 }
-function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;try{localStorage.removeItem(STORAGE_KEY)}catch(error){alert('Не удалось сбросить данные: '+error.message);return}location.reload()}
+function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;try{localStorage.removeItem(LEGACY_STORAGE_KEY);localStorage.removeItem(STORAGE_KEY)}catch(error){alert('Не удалось сбросить данные: '+error.message);return}location.reload()}
 function go(id,btn){document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function renderAll(){renderTimeMode();renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
 $('genreFilter').innerHTML+='<option value="all">Все жанры</option>';for(let [k,v] of Object.entries(GENRES))$('genreFilter').innerHTML+=`<option value="${k}">${v}</option>`;$('genreFilter').remove(1);
