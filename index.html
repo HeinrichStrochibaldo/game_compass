@@ -694,15 +694,31 @@ function mergeCatalog(games,base=BASE){
   const ids=new Set(games.map(g=>g.id));
   return [...games,...base.filter(g=>!ids.has(g.id)).map(g=>({...g}))];
 }
+const STORAGE_KEY='gamecompass-v1';
 let state={games:BASE.map(g=>({...g})),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
-try{
-  const saved=JSON.parse(localStorage.getItem('gamecompass-v1'));
-  if(saved&&Array.isArray(saved.games)){
-    state={...state,...saved,games:mergeCatalog(saved.games)};
+let storageBlocked=false;
+function loadSaved(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw===null)return;
+    const saved=validateData(JSON.parse(raw));
+    state={...saved,games:mergeCatalog(saved.games)};
+  }catch(error){
+    storageBlocked=true;
+    alert('Не удалось загрузить сохранение. Показан исходный каталог. Автосохранение заблокировано; прежние данные не перезаписаны. Восстанови проверенную резервную копию или выполни подтверждённый сброс.');
   }
-}catch(e){}
+}
+loadSaved();
+function persist(candidate,replace=false){
+  if(storageBlocked&&!replace)throw new Error('Сохранение заблокировано после ошибки загрузки');
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(candidate));
+  storageBlocked=false;
+}
 let limit=20;const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function save(){try{localStorage.setItem('gamecompass-v1',JSON.stringify(state))}catch(e){alert('Не удалось сохранить. Экспортируй данные в JSON.')}}
+function save(){
+  try{persist(state);return true}
+  catch(error){alert('Изменения не записаны. Не закрывай приложение: экспортируй JSON для резервной копии. '+error.message);return false}
+}
 function done(g){return ['2025','2026','earlier'].includes(g.status)}function h(g){if(!g.hours)return 0;return Math.round(g.hours*(state.mode==='story'?.65:state.mode==='all'?1.8:1))}function owned(g){return g.owned!=='no'&&g.status!=='unowned'}
 function badge(g){return `<span class="pill ${done(g)?'green':!owned(g)?'orange':g.screen==='oled'||g.screen==='pc3'?'blue':''}">${esc(STATUS[g.status]||g.status)}</span>`}
 function seriesNext(g){const s=state.games.filter(x=>x.series&&x.series===g.series).sort((a,b)=>a.id-b.id);const idx=s.findIndex(x=>x.id===g.id);return idx>=0?s[idx+1]:null}
@@ -731,9 +747,9 @@ async function importJSON(e){
   if(!f)return;
   try{
     const candidate=validateData(JSON.parse(await f.text()));
-    if(!confirm('Заменить текущие данные импортированными?'))return;
+    if(!confirm(storageBlocked?'Заменить недоступное сохранение проверенной резервной копией?':'Заменить текущие данные импортированными?'))return;
     // Commit to storage before replacing the active library.
-    localStorage.setItem('gamecompass-v1',JSON.stringify(candidate));
+    persist(candidate,true);
     state=candidate;
   }catch(error){
     alert('Не удалось импортировать: '+error.message);
@@ -744,7 +760,7 @@ async function importJSON(e){
   closeModal();
   renderAll();
 }
-function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;localStorage.removeItem('gamecompass-v1');location.reload()}
+function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;try{localStorage.removeItem(STORAGE_KEY)}catch(error){alert('Не удалось сбросить данные: '+error.message);return}location.reload()}
 function go(id,btn){document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function renderAll(){renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
 $('genreFilter').innerHTML+='<option value="all">Все жанры</option>';for(let [k,v] of Object.entries(GENRES))$('genreFilter').innerHTML+=`<option value="${k}">${v}</option>`;$('genreFilter').remove(1);
