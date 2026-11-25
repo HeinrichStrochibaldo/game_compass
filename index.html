@@ -715,7 +715,24 @@ function saveGame(id){let g=state.games.find(x=>x.id===id);g.status=$('editStatu
 function closeModal(){$('overlay').innerHTML=''}
 function openSettings(){$('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="row"><h2>Настройки и данные</h2><button class="btn tiny" onclick="closeModal()">✕</button></div><p class="hint">Сохранение работает локально в браузере этого iPhone. В приватном режиме или после очистки данных оно может исчезнуть. Экспортируй JSON для резервной копии.</p><div class="flex"><button class="btn primary" onclick="exportJSON()">⬇ Экспорт JSON</button><button class="btn" onclick="$('importFile').click()">⬆ Импорт JSON</button><input id="importFile" type="file" accept="application/json,.json" style="display:none" onchange="importJSON(event)"></div><div class="divider"></div><div class="check"><input type="checkbox" id="confirmReset"><label for="confirmReset">Подтверждаю сброс своих правок</label></div><button class="btn" onclick="resetData()">Сбросить к исходному каталогу</button><div class="divider"></div><p class="hint">Это автономная HTML-версия. Она не синхронизируется со Steam, не обновляет FPS автоматически и пока не имеет облачной синхронизации.</p></div></div>`}
 function exportJSON(){let blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),...state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='game-compass-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
-async function importJSON(e){let f=e.target.files?.[0];if(!f)return;try{let v=JSON.parse(await f.text());if(!Array.isArray(v.games)||!v.games.every(x=>typeof x.id==='number'&&typeof x.name==='string'))throw Error('Некорректный формат');if(!confirm('Заменить текущие данные импортированными?'))return;state={...state,...v};save();closeModal();renderAll()}catch(e){alert('Не удалось импортировать: '+e.message)}}
+async function importJSON(e){
+  const f=e.target.files?.[0];
+  if(!f)return;
+  try{
+    const candidate=validateData(JSON.parse(await f.text()));
+    if(!confirm('Заменить текущие данные импортированными?'))return;
+    // Commit to storage before replacing the active library.
+    localStorage.setItem('gamecompass-v1',JSON.stringify(candidate));
+    state=candidate;
+  }catch(error){
+    alert('Не удалось импортировать: '+error.message);
+    return;
+  }finally{
+    e.target.value='';
+  }
+  closeModal();
+  renderAll();
+}
 function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;localStorage.removeItem('gamecompass-v1');location.reload()}
 function go(id,btn){document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
 function renderAll(){renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
