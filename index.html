@@ -689,7 +689,18 @@ function validateData(v){
   if(!Array.isArray(v.recent)||typeof v.historyNotes!=='string')fail('settings');
   return {version:1,games,mode:v.mode,quick:v.quick,moods:[...v.moods],recent:[...v.recent],historyNotes:v.historyNotes};
 }
-let state={games:structuredClone(BASE),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};try{let saved=JSON.parse(localStorage.getItem('gamecompass-v1'));if(saved&&Array.isArray(saved.games)){state={...state,...saved};for(const g of BASE){let old=state.games.find(x=>x.id===g.id);if(!old)state.games.push(g);else if(g.date&&(!old.date||old.date!==g.date)){old.date=g.date;if(g.note&&!old.note)old.note=g.note}}}}catch(e){}
+// Existing records take precedence over the bundled catalog.
+function mergeCatalog(games,base=BASE){
+  const ids=new Set(games.map(g=>g.id));
+  return [...games,...base.filter(g=>!ids.has(g.id)).map(g=>({...g}))];
+}
+let state={games:BASE.map(g=>({...g})),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
+try{
+  const saved=JSON.parse(localStorage.getItem('gamecompass-v1'));
+  if(saved&&Array.isArray(saved.games)){
+    state={...state,...saved,games:mergeCatalog(saved.games)};
+  }
+}catch(e){}
 let limit=20;const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function save(){try{localStorage.setItem('gamecompass-v1',JSON.stringify(state))}catch(e){alert('Не удалось сохранить. Экспортируй данные в JSON.')}}
 function done(g){return ['2025','2026','earlier'].includes(g.status)}function h(g){if(!g.hours)return 0;return Math.round(g.hours*(state.mode==='story'?.65:state.mode==='all'?1.8:1))}function owned(g){return g.owned!=='no'&&g.status!=='unowned'}
