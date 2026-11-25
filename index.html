@@ -660,11 +660,22 @@ const SCREENS={tv:'Текущий ТВ 4K/60',monitor:'Монитор 1440p',ole
 const STATUS={2025:'Пройдена · 2025',2026:'Пройдена · 2026',earlier:'Пройдена ранее',unknown:'Не уточнён',unowned:'Не куплена'};
 const MOODS=['На один вечер','Сюжет','Без напряжения','Хочу экшен','Хочу испугаться','Большой мир','Сложный вызов','Гонки','Вдвоём','Кооператив','Продолжение серии','Сменить жанр','До OLED','На месяц'];
 // Validate legacy and current backups without changing the input.
+const APP_VERSION='0.1.1';
+const DATA_VERSION=1;
+function migrateData(raw){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('Некорректный формат данных');
+  const version=Object.hasOwn(raw,'version')?raw.version:0;
+  if(!Number.isSafeInteger(version)||version<0||version>DATA_VERSION)throw new Error('Неподдерживаемая версия данных: '+String(version));
+  let data={...raw};
+  // Legacy saves without a version use the same fields as format 1.
+  if(version===0)data={...data,version:1};
+  return validateData(data);
+}
 function validateData(v){
   const fail=field=>{throw new Error('Некорректное поле: '+field)};
   const one=(x,values)=>values.includes(x);
   if(!v||typeof v!=='object'||Array.isArray(v))fail('данные');
-  if(v.version!==undefined&&v.version!==1)fail('version');
+  if(v.version!==DATA_VERSION)fail('version');
   if(!Array.isArray(v.games)||!v.games.length)fail('games');
   const ids=new Set();
   const games=v.games.map(g=>{
@@ -687,7 +698,7 @@ function validateData(v){
   if(!one(v.quick,['all','short','switch','series','oled','pc3','cozy']))fail('quick');
   if(!Array.isArray(v.moods)||v.moods.length>5||!v.moods.every(m=>MOODS.includes(m))||new Set(v.moods).size!==v.moods.length)fail('moods');
   if(!Array.isArray(v.recent)||typeof v.historyNotes!=='string')fail('settings');
-  return {version:1,games,mode:v.mode,quick:v.quick,moods:[...v.moods],recent:[...v.recent],historyNotes:v.historyNotes};
+  return {version:DATA_VERSION,games,mode:v.mode,quick:v.quick,moods:[...v.moods],recent:[...v.recent],historyNotes:v.historyNotes};
 }
 // Existing records take precedence over the bundled catalog.
 function mergeCatalog(games,base=BASE){
@@ -695,13 +706,13 @@ function mergeCatalog(games,base=BASE){
   return [...games,...base.filter(g=>!ids.has(g.id)).map(g=>({...g}))];
 }
 const STORAGE_KEY='gamecompass-v1';
-let state={games:BASE.map(g=>({...g})),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
+let state={version:DATA_VERSION,games:BASE.map(g=>({...g})),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
 let storageBlocked=false;
 function loadSaved(){
   try{
     const raw=localStorage.getItem(STORAGE_KEY);
     if(raw===null)return;
-    const saved=validateData(JSON.parse(raw));
+    const saved=migrateData(JSON.parse(raw));
     state={...saved,games:mergeCatalog(saved.games)};
   }catch(error){
     storageBlocked=true;
@@ -711,7 +722,7 @@ function loadSaved(){
 loadSaved();
 function persist(candidate,replace=false){
   if(storageBlocked&&!replace)throw new Error('Сохранение заблокировано после ошибки загрузки');
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(candidate));
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(migrateData(candidate)));
   storageBlocked=false;
 }
 let limit=20;const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -741,12 +752,12 @@ function openGame(id){let g=state.games.find(x=>x.id===id);if(!g)return;let next
 function saveGame(id){let g=state.games.find(x=>x.id===id);g.status=$('editStatus').value;g.owned=$('editOwned').value;g.date=$('editDate').value;g.order=$('editOrder').value?Number($('editOrder').value):null;g.note=$('editNote').value;if(g.status==='unowned')g.owned='no';save();closeModal();renderAll()}
 function closeModal(){$('overlay').innerHTML=''}
 function openSettings(){$('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="row"><h2>Настройки и данные</h2><button class="btn tiny" onclick="closeModal()">✕</button></div><p class="hint">Сохранение работает локально в браузере этого iPhone. В приватном режиме или после очистки данных оно может исчезнуть. Экспортируй JSON для резервной копии.</p><div class="flex"><button class="btn primary" onclick="exportJSON()">⬇ Экспорт JSON</button><button class="btn" onclick="$('importFile').click()">⬆ Импорт JSON</button><input id="importFile" type="file" accept="application/json,.json" style="display:none" onchange="importJSON(event)"></div><div class="divider"></div><div class="check"><input type="checkbox" id="confirmReset"><label for="confirmReset">Подтверждаю сброс своих правок</label></div><button class="btn" onclick="resetData()">Сбросить к исходному каталогу</button><div class="divider"></div><p class="hint">Это автономная HTML-версия. Она не синхронизируется со Steam, не обновляет FPS автоматически и пока не имеет облачной синхронизации.</p></div></div>`}
-function exportJSON(){let blob=new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),...state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='game-compass-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
+function exportJSON(){let blob=new Blob([JSON.stringify({...state,version:DATA_VERSION,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='game-compass-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
 async function importJSON(e){
   const f=e.target.files?.[0];
   if(!f)return;
   try{
-    const candidate=validateData(JSON.parse(await f.text()));
+    const candidate=migrateData(JSON.parse(await f.text()));
     if(!confirm(storageBlocked?'Заменить недоступное сохранение проверенной резервной копией?':'Заменить текущие данные импортированными?'))return;
     // Commit to storage before replacing the active library.
     persist(candidate,true);
