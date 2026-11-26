@@ -129,3 +129,24 @@ test('reject invalid completion and appearance metadata',async({page})=>{
     return cases.every(c=>{try{migrateData(c);return false}catch{return true}});
   })).toBe(true);
 });
+
+test('appearance controls persist and follow system color scheme',async({page})=>{
+  const scheme=()=>page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme);
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.getByRole('button',{name:'Настройки'}).click();
+  await page.getByRole('button',{name:'Светлая',exact:true}).click();
+  expect(await scheme()).toBe('light');
+  await expect(page.getByRole('button',{name:'Светлая',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.reload();
+  expect(await scheme()).toBe('light');
+  await page.getByRole('button',{name:'Настройки'}).click();
+  await page.getByRole('button',{name:'Тёмная',exact:true}).click();
+  await page.emulateMedia({colorScheme:'light'});
+  expect(await scheme()).toBe('dark');
+  await page.getByRole('button',{name:'Как в системе',exact:true}).click();
+  expect(await scheme()).toBe('light');
+  await page.emulateMedia({colorScheme:'dark'});
+  expect(await scheme()).toBe('dark');
+  await page.reload();
+  expect(await page.evaluate(()=>document.documentElement.dataset.theme)).toBe('auto');
+});
