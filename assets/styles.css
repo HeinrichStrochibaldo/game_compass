@@ -33,3 +33,8 @@
   .brand{font-size:17px}
 }
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Lock the background only while a dialog exists; closing restores scrolling. */
+html:has(#overlay .modalbg),body:has(#overlay .modalbg){overflow:hidden;overscroll-behavior:none}
+.modal{overscroll-behavior:contain}
+.modalbg{overscroll-behavior:none}
