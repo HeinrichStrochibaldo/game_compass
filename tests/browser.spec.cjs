@@ -1,4 +1,16 @@
 const {test,expect}=require('@playwright/test');
+function executedRanges(functions){
+  const blocks=functions.flatMap(f=>f.ranges);
+  const edges=[...new Set(blocks.flatMap(r=>[r.startOffset,r.endOffset]))].sort((a,b)=>a-b);
+  const result=[];
+  for(let i=1;i<edges.length;i++){
+    const start=edges[i-1],end=edges[i];
+    const inner=blocks.filter(r=>r.startOffset<=start&&r.endOffset>=end)
+      .sort((a,b)=>(a.endOffset-a.startOffset)-(b.endOffset-b.startOffset))[0];
+    if(inner&&inner.count>0)result.push({start,end});
+  }
+  return result;
+}
 const coverage=new Map();
 test.beforeEach(async({page,browserName})=>{
   if(browserName==='chromium') await page.coverage.startJSCoverage({resetOnNavigation:false});
@@ -10,7 +22,7 @@ test.afterEach(async({page,browserName})=>{
     const path=new URL(entry.url).pathname;
     if(!/^\/js\/[^/]+\.js$/.test(path))continue;
     if(!coverage.has(path))coverage.set(path,{length:entry.source.length,ranges:[]});
-    coverage.get(path).ranges.push(...entry.ranges);
+    coverage.get(path).ranges.push(...executedRanges(entry.functions));
   }
 });
 test.afterAll(()=>{
