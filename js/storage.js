@@ -1,6 +1,6 @@
 const STORAGE_KEY='gamecompass-v2';
 const LEGACY_STORAGE_KEY='gamecompass-v1';
-let state={version:DATA_VERSION,games:BASE.map(legacyGame),mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
+let state={version:DATA_VERSION,games:BASE.map(legacyGame),theme:'auto',catalogLayout:'list',mode:'extra',moods:[],quick:'all',recent:[],historyNotes:''};
 let storageBlocked=false;
 function loadSaved(){
   try{
