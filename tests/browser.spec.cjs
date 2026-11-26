@@ -60,14 +60,18 @@ test('catalog search and filters',async({page})=>{
 test('edit and reload',async({page})=>{
   await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
   await page.locator('#search').fill('DOOM Eternal');
-  await page.locator('#catalogList').getByRole('button',{name:'Открыть'}).click();
+  await page.locator('#catalogList .game').click();
+  await expect(page.locator('#editNote')).toHaveCount(0);
+  await page.getByRole('button',{name:'Редактировать',exact:true}).click();
   await page.locator('#editNote').fill('Browser regression test');
   await page.locator('#overlay').getByRole('button',{name:'Сохранить',exact:true}).click();
   await expect(page.locator('#overlay .modal')).toHaveCount(0);
   await page.reload();
   await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
   await page.locator('#search').fill('DOOM Eternal');
-  await page.locator('#catalogList').getByRole('button',{name:'Открыть'}).click();
+  await page.locator('#catalogList .game').click();
+  await expect(page.locator('#editNote')).toHaveCount(0);
+  await page.getByRole('button',{name:'Редактировать',exact:true}).click();
   await expect(page.locator('#editNote')).toHaveValue('Browser regression test');
 });
 test('mood and randomizer',async({page})=>{
