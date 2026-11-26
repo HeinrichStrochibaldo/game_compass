@@ -77,3 +77,6 @@ for(const [name,change] of [
  ['invalid history notes',v=>v.historyNotes=42]
 ])test('reject '+name,()=>{const a=boot(),v=fixture();change(v);const before=JSON.stringify(v);assert.throws(()=>a.migrateData(v));assert.equal(JSON.stringify(v),before)});
 test('invalid import preserves existing saved data',async()=>{const raw=JSON.stringify(fixture()),a=boot(raw),v=fixture();v.games=[];await a.importJSON({target:{value:'file',files:[{text:async()=>JSON.stringify(v)}]}});assert.equal(a.stored(),raw);assert.equal(a.writes(),0)});
+
+test('excluded mood score is finite with or without moods',()=>{for(const g of [game({owned:'no'}),game({progress:'completed'})])for(const moods of [[],['Хочу экшен']])assert.equal(R.moodScore(g,context([g],{moods})),-999)});
+test('series rank independent of catalog order',()=>{const a=game({series:'S',progress:'completed'}),b=game({id:2,series:'S'}),c=game({id:3,series:'S'});assert.deepEqual(R.rank(c,context([a,b,c])),R.rank(c,context([b,a,c])))});
