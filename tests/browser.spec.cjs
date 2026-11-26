@@ -150,3 +150,17 @@ test('appearance controls persist and follow system color scheme',async({page})=
   await page.reload();
   expect(await page.evaluate(()=>document.documentElement.dataset.theme)).toBe('auto');
 });
+
+test('independent screens and top navigation',async({page})=>{
+  for(const [name,id] of [['Каталог','catalog'],['История','history'],['Подбор','picker'],['Главная','home']]){
+    const button=page.locator('nav').getByRole('button',{name});
+    await button.click();
+    await expect(button).toHaveAttribute('aria-current','page');
+    for(const key of ['home','catalog','history','picker']){
+      if(key===id)await expect(page.locator('#'+key)).toBeVisible();
+      else await expect(page.locator('#'+key)).toBeHidden();
+    }
+  }
+  await expect(page.locator('header nav')).toBeVisible();
+  await expect(page.locator('nav.bottom')).toHaveCount(0);
+});

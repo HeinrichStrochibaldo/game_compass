@@ -67,7 +67,31 @@ async function importJSON(e){
   renderAll();
 }
 function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;try{localStorage.removeItem(LEGACY_STORAGE_KEY);localStorage.removeItem(STORAGE_KEY)}catch(error){alert('Не удалось сбросить данные: '+error.message);return}location.reload()}
-function go(id,btn){document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
+const screens=['home','catalog','history','picker'];let activeScreen='home';const screenScroll=new Map();
+function go(id){
+  if(!screens.includes(id)||id===activeScreen)return;
+  screenScroll.set(activeScreen,window.scrollY);
+  activeScreen=id;
+  screens.forEach(key=>{$(key).hidden=key!==id});
+  $('dataNotice').hidden=id!=='home';
+  document.querySelectorAll('.nav button').forEach((button,i)=>{const selected=screens[i]===id;button.classList.toggle('active',selected);if(selected)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current')});
+  window.scrollTo({top:screenScroll.get(id)||0,behavior:'instant'});
+}
+let swipeStart=null;
+const screenArea=document.querySelector('main');
+screenArea.addEventListener('touchstart',event=>{
+  swipeStart=null;
+  if(event.touches.length!==1||event.target.closest('button,input,select,textarea,a,.chips,.seg,.check')||$('overlay').children.length)return;
+  const t=event.touches[0];swipeStart={x:t.clientX,y:t.clientY};
+},{passive:true});
+screenArea.addEventListener('touchcancel',()=>{swipeStart=null},{passive:true});
+screenArea.addEventListener('touchend',event=>{
+  const start=swipeStart;swipeStart=null;
+  if(!start||event.touches.length||event.changedTouches.length!==1)return;
+  const t=event.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y;
+  if(Math.abs(dx)<65||Math.abs(dx)<Math.abs(dy)*1.5)return;
+  const id=screens[screens.indexOf(activeScreen)+(dx<0?1:-1)];if(id)go(id);
+},{passive:true});
 function renderAll(){applyTheme();renderTimeMode();renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
 $('genreFilter').innerHTML+='<option value="all">Все жанры</option>';for(let [k,v] of Object.entries(GENRES))$('genreFilter').innerHTML+=`<option value="${k}">${v}</option>`;$('genreFilter').remove(1);
 function renderTimeMode(){$('timeMode').innerHTML=[['story','Сюжет'],['extra','С допами'],['all','100%']].map(([k,v])=>`<button class="${state.mode===k?'on':''}" onclick="setMode('${k}')">${v}</button>`).join('')}

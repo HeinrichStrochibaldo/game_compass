@@ -41,3 +41,6 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 html:has(#overlay .modalbg),body:has(#overlay .modalbg){overflow:hidden;overscroll-behavior:none}
 .modal{overscroll-behavior:contain}
 .modalbg{overscroll-behavior:none}
+
+/* Independent screens and top navigation. */
+.top-tabs{max-width:740px;margin:10px auto 0}.top-tabs .nav button{min-height:44px;font-size:13px;border-radius:0;border-bottom:2px solid transparent}.top-tabs .nav button.active{background:transparent;color:var(--accent);border-bottom-color:var(--accent)}main{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}.section[hidden]{display:none!important}
