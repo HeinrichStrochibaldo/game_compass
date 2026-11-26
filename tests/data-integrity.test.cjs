@@ -54,3 +54,26 @@ test('series successor sorted by id',()=>{const a=game({series:'S'}),b=game({id:
 test('history prioritizes actual dates',()=>{const a=game({progress:'completed',date:'2025-01-01'}),b=game({id:2,progress:'completed',date:'2026-01-01'}),c=game({id:3,progress:'completed',order:99});assert.deepEqual(R.lastPlayed(context([a,c,b])).map(x=>x.id),[2,1,3])});
 test('mood adds short session bonus',()=>{const a=game({hours:8});assert.equal(R.moodScore(a,context([a],{moods:['На один вечер']})),R.rank(a,context([a])).score+8)});
 test('recommendation does not mutate context',()=>{const c=context([game(),game({id:2,progress:'completed'})]);const before=JSON.stringify(c);R.recList(c);R.lastPlayed(c);assert.equal(JSON.stringify(c),before)});
+
+test('empty recommendation context',()=>{assert.deepEqual(R.recList(context()),[]);assert.deepEqual(R.lastPlayed(context()),[])});
+test('all candidates excluded',()=>assert.deepEqual(R.recList(context([game({progress:'completed'}),game({id:2,owned:'no'})])),[]));
+test('zero duration stays zero',()=>assert.equal(R.h(game({hours:0}),context()),0));
+test('independent recommendation contexts',()=>{const a=game();assert.equal(R.h(a,context([],{mode:'story'})),13);assert.equal(R.h(a,context([],{mode:'all'})),36);assert.equal(R.h(a,context([],{mode:'story'})),13)});
+test('conflicting moods combine independently',()=>{const a=game({hours:8,genre:'action'});assert.equal(R.moodScore(a,context([a],{moods:['На один вечер','Без напряжения','Хочу экшен']})),R.rank(a,context([a])).score+8-2+7)});
+test('series completion bonus',()=>{const a=game({series:'S',progress:'completed'}),b=game({id:2,series:'S'});assert.equal(R.rank(b,context([a,b])).score,R.rank({...b,series:''},context([a,b])).score+8)});
+test('unfinished predecessor penalty',()=>{const a=game({series:'S'}),b=game({id:2,series:'S'});assert.equal(R.rank(b,context([a,b])).score,R.rank({...b,series:''},context([a,b])).score-12)});
+for(const [name,change] of [
+ ['empty catalog',v=>v.games=[]],
+ ['duplicate id',v=>v.games[1].id=v.games[0].id],
+ ['blank name',v=>v.games[0].name=' '],
+ ['self parent',v=>{v.games[0].kind='dlc';v.games[0].parentId=v.games[0].id}],
+ ['non DLC parent link',v=>{v.games[0].kind='base';v.games[0].parentId=v.games[1].id}],
+ ['inconsistent history',v=>{v.games[0].progress='in_progress';v.games[0].historyGroup='2025'}],
+ ['duplicate moods',v=>v.moods=['Сюжет','Сюжет']],
+ ['too many moods',v=>v.moods=['Сюжет','Гонки','Вдвоём','Кооператив','До OLED','На месяц']],
+ ['invalid mode',v=>v.mode='bad'],
+ ['invalid quick filter',v=>v.quick='bad'],
+ ['invalid recent',v=>v.recent=null],
+ ['invalid history notes',v=>v.historyNotes=42]
+])test('reject '+name,()=>{const a=boot(),v=fixture();change(v);const before=JSON.stringify(v);assert.throws(()=>a.migrateData(v));assert.equal(JSON.stringify(v),before)});
+test('invalid import preserves existing saved data',async()=>{const raw=JSON.stringify(fixture()),a=boot(raw),v=fixture();v.games=[];await a.importJSON({target:{value:'file',files:[{text:async()=>JSON.stringify(v)}]}});assert.equal(a.stored(),raw);assert.equal(a.writes(),0)});
