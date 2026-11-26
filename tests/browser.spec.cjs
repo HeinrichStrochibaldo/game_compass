@@ -40,6 +40,7 @@ test('startup and navigation',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.reload();
   await expect(page.locator('#stats .stat strong').first()).toHaveText('50');
+  await expect(page.locator('#stats')).toBeHidden();
   await expect(page.locator('#next .big')).not.toBeEmpty();
   for(const [name,id] of [['Каталог','catalog'],['История','history'],['Подбор','picker'],['Главная','home']]){
     await page.locator('nav').getByRole('button',{name}).click();
@@ -59,22 +60,29 @@ test('catalog search and filters',async({page})=>{
 test('edit and reload',async({page})=>{
   await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
   await page.locator('#search').fill('DOOM Eternal');
-  await page.locator('#catalogList').getByRole('button',{name:'Открыть'}).click();
+  await page.locator('#catalogList .game').click();
+  await expect(page.locator('#editNote')).toHaveCount(0);
+  await page.getByRole('button',{name:'Редактировать',exact:true}).click();
   await page.locator('#editNote').fill('Browser regression test');
   await page.locator('#overlay').getByRole('button',{name:'Сохранить',exact:true}).click();
   await expect(page.locator('#overlay .modal')).toHaveCount(0);
   await page.reload();
   await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
   await page.locator('#search').fill('DOOM Eternal');
-  await page.locator('#catalogList').getByRole('button',{name:'Открыть'}).click();
+  await page.locator('#catalogList .game').click();
+  await expect(page.locator('#editNote')).toHaveCount(0);
+  await page.getByRole('button',{name:'Редактировать',exact:true}).click();
   await expect(page.locator('#editNote')).toHaveValue('Browser regression test');
 });
 test('mood and randomizer',async({page})=>{
   await page.locator('nav').getByRole('button',{name:'Подбор'}).click();
   await page.locator('#moodTags').getByRole('button',{name:'Сюжет',exact:true}).click();
   await expect(page.locator('#moodTags').getByRole('button',{name:'Сюжет',exact:true})).toHaveClass(/\bon\b/);
-  await page.getByRole('button',{name:'Подобрать 3 игры'}).click();
-  await expect(page.locator('#pickerResult .game')).toHaveCount(3);
+  await page.getByRole('button',{name:'Подобрать игру'}).click();
+  await expect(page.locator('#pickerResult .game')).toHaveCount(1);
+  const first=await page.locator('#pickerResult .game').textContent();
+  await page.getByRole('button',{name:'Другой вариант'}).click();
+  expect(await page.locator('#pickerResult .game').textContent()).not.toBe(first);
   await page.getByRole('button',{name:'Рандомайзер'}).click();
   await expect(page.locator('#pickerResult .game')).toHaveCount(1);
 });
@@ -102,4 +110,180 @@ test('modal locks background and restores overflow',async({page})=>{
   await page.evaluate(()=>closeModal());
   await expect(page.locator('#overlay .modal')).toHaveCount(0);
   expect(await overflow()).toEqual(initial);
+});
+
+test('completion metadata and appearance survive migration and reload',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const old={version:1,games:BASE,mode:'extra',quick:'all',moods:[],recent:[],historyNotes:''};
+    const migrated=migrateData(old);
+    const v2={...migrated,games:migrated.games.map(({actualHours,platform,...g})=>g)};
+    delete v2.theme;delete v2.catalogLayout;
+    const restored=migrateData(v2);
+    const candidate={...restored,theme:'dark',catalogLayout:'grid',games:restored.games.map((g,i)=>i===0?{...g,progress:'completed',historyGroup:'2027',date:'2027-01-02',actualHours:12.5,platform:'steam'}:g)};
+    persist(candidate);
+    return {count:restored.games.length,defaults:restored.games.every(g=>g.actualHours===null&&g.platform==='unknown'),theme:restored.theme,layout:restored.catalogLayout,restoredGames:restored.games,migratedGames:migrated.games};
+  });
+  const {restoredGames,migratedGames,...summary}=result;
+  expect(summary).toEqual({count:50,defaults:true,theme:'auto',layout:'list'});
+  expect(restoredGames).toEqual(migratedGames);
+  await page.reload();
+  expect(await page.evaluate(()=>({theme:state.theme,layout:state.catalogLayout,hours:state.games[0].actualHours,platform:state.games[0].platform,group:state.games[0].historyGroup}))).toEqual({theme:'dark',layout:'grid',hours:12.5,platform:'steam',group:'2027'});
+});
+test('reject invalid completion and appearance metadata',async({page})=>{
+  expect(await page.evaluate(()=>{
+    const base=migrateData(state);
+    const cases=[{actualHours:-1},{actualHours:'12'},{actualHours:Infinity},{platform:'invalid'},{historyGroup:'bad'}].map(p=>({...base,games:base.games.map((g,i)=>i===0?{...g,...p}:g)}));
+    cases.push({...base,theme:'invalid'},{...base,catalogLayout:'invalid'});
+    return cases.every(c=>{try{migrateData(c);return false}catch{return true}});
+  })).toBe(true);
+});
+
+test('appearance controls persist and follow system color scheme',async({page})=>{
+  const scheme=()=>page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme);
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.getByRole('button',{name:'Настройки'}).click();
+  await page.getByRole('button',{name:'Светлая',exact:true}).click();
+  expect(await scheme()).toBe('light');
+  await expect(page.getByRole('button',{name:'Светлая',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.reload();
+  expect(await scheme()).toBe('light');
+  await page.getByRole('button',{name:'Настройки'}).click();
+  await page.getByRole('button',{name:'Тёмная',exact:true}).click();
+  await page.emulateMedia({colorScheme:'light'});
+  expect(await scheme()).toBe('dark');
+  await page.getByRole('button',{name:'Как в системе',exact:true}).click();
+  expect(await scheme()).toBe('light');
+  await page.emulateMedia({colorScheme:'dark'});
+  expect(await scheme()).toBe('dark');
+  await page.reload();
+  expect(await page.evaluate(()=>document.documentElement.dataset.theme)).toBe('auto');
+});
+
+test('independent screens and top navigation',async({page})=>{
+  for(const [name,id] of [['Каталог','catalog'],['История','history'],['Подбор','picker'],['Главная','home']]){
+    const button=page.locator('nav').getByRole('button',{name});
+    await button.click();
+    await expect(button).toHaveAttribute('aria-current','page');
+    for(const key of ['home','catalog','history','picker']){
+      if(key===id)await expect(page.locator('#'+key)).toBeVisible();
+      else await expect(page.locator('#'+key)).toBeHidden();
+    }
+  }
+  await expect(page.locator('header nav')).toBeVisible();
+  await expect(page.locator('nav.bottom')).toHaveCount(0);
+});
+
+test('catalog layout persists and home reflects current game',async({page})=>{
+  await page.evaluate(()=>{const candidate=migrateData({...state,games:state.games.map((g,i)=>i===0?{...g,progress:'in_progress',historyGroup:null}:g)});persist(candidate);state=candidate;renderAll()});
+  await expect(page.locator('#currentGame .game')).toHaveCount(1);
+  await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
+  await page.getByRole('button',{name:'Сетка',exact:true}).click();
+  await expect(page.locator('#catalogList')).toHaveClass(/catalog-grid/);
+  await page.locator('#statusFilter').selectOption('in_progress');
+  await expect(page.locator('#catalogList .game')).toHaveCount(1);
+  await page.reload();
+  await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
+  await expect(page.locator('#catalogList')).toHaveClass(/catalog-grid/);
+  await page.getByRole('button',{name:'Список',exact:true}).click();
+  await expect(page.locator('#catalogList')).not.toHaveClass(/catalog-grid/);
+});
+
+test('completion and unsaved edit protection',async({page})=>{
+ await page.evaluate(()=>openGame(state.games.find(g=>!done(g)).id));
+ await page.getByRole('button',{name:'Редактировать',exact:true}).click();
+ await page.locator('#editNote').fill('unsaved');
+ page.once('dialog',d=>d.dismiss());
+ await page.getByRole('button',{name:'Отмена',exact:true}).click();
+ await expect(page.locator('#editNote')).toHaveValue('unsaved');
+ page.once('dialog',d=>d.accept());
+ await page.getByRole('button',{name:'Отмена',exact:true}).click();
+ await page.evaluate(()=>openGame(state.games.find(g=>!done(g)).id));
+ await page.getByRole('button',{name:'Завершить игру',exact:true}).click();
+ await page.locator('#finishHours').fill('12.5');
+ await page.locator('#finishPlatform').selectOption('steam');
+ await page.locator('#finishDate').fill('2026-11-26');
+ await page.getByRole('button',{name:'Сохранить завершение'}).click();
+ await page.reload();
+ expect(await page.evaluate(()=>state.games.some(g=>g.progress==='completed'&&g.actualHours===12.5&&g.platform==='steam'&&g.date==='2026-11-26'))).toBe(true);
+});
+
+test('picker duration applies to recommendations and randomizer',async({page})=>{
+ await page.locator('nav').getByRole('button',{name:'Подбор'}).click();
+ await page.locator('#pickerDuration').selectOption('evening');
+ expect(await page.evaluate(()=>pool().every(g=>h(g)>0&&h(g)<=4))).toBe(true);
+ await page.locator('#pickerDuration').selectOption('long');
+ expect(await page.evaluate(()=>pool().every(g=>h(g)>12))).toBe(true);
+ await page.getByRole('button',{name:'Подобрать игру'}).click();
+ await expect(page.locator('#pickerResult .game')).toHaveCount(1);
+});
+
+test('history supports future years and actual hours without changing historical dates',async({page})=>{
+ await page.evaluate(()=>{const candidate=migrateData({...state,games:state.games.map((g,i)=>i===0?{...g,progress:'completed',historyGroup:'2027',date:'2027-01-02',actualHours:12.5,platform:'steam'}:g)});persist(candidate);state=candidate;renderAll()});
+ await page.locator('nav').getByRole('button',{name:'История'}).click();
+ await page.locator('#historyYear').selectOption('2027');
+ await expect(page.locator('#historyList .history-entry')).toHaveCount(1);
+ await expect(page.locator('#historyList')).toContainText('12.5 ч');
+ await expect(page.locator('#historyList')).toContainText('Steam');
+ await expect(page.locator('#historyList')).not.toContainText('порядок #');
+ await page.locator('#historyList .history-entry').click();
+ await page.getByRole('button',{name:'Редактировать',exact:true}).click();
+ await expect(page.locator('#editStatus')).toHaveValue('2027');
+ await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ expect(await page.evaluate(()=>state.games[0].historyGroup)).toBe('2027');
+});
+
+test('settings catalog layout persists',async({page})=>{
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await page.getByRole('group',{name:'Вид каталога в настройках'}).getByRole('button',{name:'Сетка'}).click();
+ expect(await page.evaluate(()=>state.catalogLayout)).toBe('grid');
+ await page.reload();
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await expect(page.getByRole('group',{name:'Вид каталога в настройках'}).getByRole('button',{name:'Сетка'})).toHaveAttribute('aria-pressed','true');
+});
+
+test('audit: version, status labels and theme color',async({page})=>{
+ expect(await page.evaluate(()=>APP_VERSION)).toBe('0.5.1');
+ expect(await page.evaluate(()=>badge({...state.games[0],progress:'in_progress'}))).toContain('В процессе');
+ expect(await page.evaluate(()=>badge({...state.games[0],progress:'not_started'}))).toContain('Не начата');
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await page.getByRole('button',{name:'Светлая',exact:true}).click();
+ await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#f2f2f7');
+});
+
+test('horizontal swipe on game card navigates without opening it',async({page})=>{
+ await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
+ await page.locator('#catalogList .game-link').first().evaluate(el=>{
+ const event=(type,x)=>{const e=new Event(type,{bubbles:true,cancelable:true});Object.defineProperties(e,{touches:{value:type==='touchstart'?[{clientX:x,clientY:100}]:[]},changedTouches:{value:[{clientX:x,clientY:100}]}});el.dispatchEvent(e)};
+ event('touchstart',220);event('touchend',80);
+ });
+ await expect(page.locator('#history')).toBeVisible();
+ await expect(page.locator('#overlay .modal')).toHaveCount(0);
+});
+
+test('rollback snapshot preserves exact prior bytes across writes',async({page})=>{
+ const result=await page.evaluate(()=>{
+ localStorage.removeItem(ROLLBACK_KEY);
+ const original=JSON.stringify(state,null,2);
+ localStorage.setItem(STORAGE_KEY,original);
+ persist({...state,theme:'dark'});
+ persist({...state,theme:'light'});
+ return {same:localStorage.getItem(ROLLBACK_KEY)===original,current:JSON.parse(localStorage.getItem(STORAGE_KEY)).theme};
+ });
+ expect(result).toEqual({same:true,current:'light'});
+ await page.reload();
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await expect(page.getByRole('button',{name:'Скачать снимок до обновления'})).toBeVisible();
+});
+
+test('edit completion metadata and preserve unknown hours',async({page})=>{
+ await page.evaluate(()=>editGame(state.games[0].id));
+ await page.locator('#editHours').fill('12.5');
+ await page.locator('#editPlatform').selectOption('steam');
+ await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await page.reload();
+ expect(await page.evaluate(()=>[state.games[0].actualHours,state.games[0].platform])).toEqual([12.5,'steam']);
+ await page.evaluate(()=>editGame(state.games[0].id));
+ await page.locator('#editHours').fill('');
+ await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ expect(await page.evaluate(()=>state.games[0].actualHours)).toBeNull();
 });
