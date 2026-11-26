@@ -17,3 +17,21 @@ jobs:
         with:
           node-version: '22'
       - run: node --test tests/data-integrity.test.cjs
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --no-package-lock --ignore-scripts @playwright/test@1.51.1
+      - run: npx --no-install playwright install --with-deps chromium webkit
+      - run: npx --no-install playwright test --config=playwright.config.cjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-traces
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
