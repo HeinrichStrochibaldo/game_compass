@@ -259,3 +259,18 @@ test('horizontal swipe on game card navigates without opening it',async({page})=
  await expect(page.locator('#history')).toBeVisible();
  await expect(page.locator('#overlay .modal')).toHaveCount(0);
 });
+
+test('rollback snapshot preserves exact prior bytes across writes',async({page})=>{
+ const result=await page.evaluate(()=>{
+ localStorage.removeItem(ROLLBACK_KEY);
+ const original=JSON.stringify(state,null,2);
+ localStorage.setItem(STORAGE_KEY,original);
+ persist({...state,theme:'dark'});
+ persist({...state,theme:'light'});
+ return {same:localStorage.getItem(ROLLBACK_KEY)===original,current:JSON.parse(localStorage.getItem(STORAGE_KEY)).theme};
+ });
+ expect(result).toEqual({same:true,current:'light'});
+ await page.reload();
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await expect(page.getByRole('button',{name:'Скачать снимок до обновления'})).toBeVisible();
+});
