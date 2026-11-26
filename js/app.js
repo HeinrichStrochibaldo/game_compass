@@ -7,6 +7,8 @@ function updateSettings(patch){
   try{const candidate=migrateData({...state,...patch});persist(candidate);state=candidate;return true}
   catch(error){alert('Не удалось сохранить настройки: '+error.message);return false}
 }
+function applyTheme(){document.documentElement.dataset.theme=state.theme||'auto'}
+function setTheme(theme){if(updateSettings({theme})){applyTheme();openSettings()}}
 function setMode(mode){if(updateSettings({mode})){renderTimeMode();renderHome();renderCatalog()}}
 function setQuick(quick){if(updateSettings({quick}))renderHome()}
 const {done,owned,performance}=Recommendation;
@@ -43,7 +45,7 @@ function saveGame(id){
   closeModal();renderAll();
 }
 function closeModal(){$('overlay').innerHTML=''}
-function openSettings(){$('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="row"><h2>Настройки и данные</h2><span class="pill">v${APP_VERSION}</span><button class="btn tiny" onclick="closeModal()">✕</button></div><p class="hint">Сохранение работает локально в браузере этого iPhone. В приватном режиме или после очистки данных оно может исчезнуть. Экспортируй JSON для резервной копии.</p><div class="flex"><button class="btn primary" onclick="exportJSON()">⬇ Экспорт JSON</button><button class="btn" onclick="$('importFile').click()">⬆ Импорт JSON</button><input id="importFile" type="file" accept="application/json,.json" style="display:none" onchange="importJSON(event)"></div><div class="divider"></div><div class="check"><input type="checkbox" id="confirmReset"><label for="confirmReset">Подтверждаю сброс своих правок</label></div><button class="btn" onclick="resetData()">Сбросить к исходному каталогу</button><div class="divider"></div><p class="hint">Это автономная HTML-версия. Она не синхронизируется со Steam, не обновляет FPS автоматически и пока не имеет облачной синхронизации.</p></div></div>`}
+function openSettings(){$('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="row"><h2>Настройки и данные</h2><span class="pill">v${APP_VERSION}</span><button class="btn tiny" onclick="closeModal()">✕</button></div><h3>Оформление</h3><div class="seg" role="group" aria-label="Тема оформления">${[['auto','Как в системе'],['light','Светлая'],['dark','Тёмная']].map(([key,label])=>`<button class="${state.theme===key?'on':''}" aria-pressed="${state.theme===key}" onclick="setTheme('${key}')">${label}</button>`).join('')}</div><div class="divider"></div><p class="hint">Сохранение работает локально в браузере этого iPhone. В приватном режиме или после очистки данных оно может исчезнуть. Экспортируй JSON для резервной копии.</p><div class="flex"><button class="btn primary" onclick="exportJSON()">⬇ Экспорт JSON</button><button class="btn" onclick="$('importFile').click()">⬆ Импорт JSON</button><input id="importFile" type="file" accept="application/json,.json" style="display:none" onchange="importJSON(event)"></div><div class="divider"></div><div class="check"><input type="checkbox" id="confirmReset"><label for="confirmReset">Подтверждаю сброс своих правок</label></div><button class="btn" onclick="resetData()">Сбросить к исходному каталогу</button><div class="divider"></div><p class="hint">Это автономная HTML-версия. Она не синхронизируется со Steam, не обновляет FPS автоматически и пока не имеет облачной синхронизации.</p></div></div>`}
 function exportJSON(){let blob=new Blob([JSON.stringify({...state,version:DATA_VERSION,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='game-compass-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
 async function importJSON(e){
   const f=e.target.files?.[0];
@@ -66,7 +68,7 @@ async function importJSON(e){
 }
 function resetData(){if(!$('confirmReset').checked)return alert('Сначала подтверди сброс');if(!confirm('Удалить все изменения?'))return;try{localStorage.removeItem(LEGACY_STORAGE_KEY);localStorage.removeItem(STORAGE_KEY)}catch(error){alert('Не удалось сбросить данные: '+error.message);return}location.reload()}
 function go(id,btn){document.getElementById(id).scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active')}
-function renderAll(){renderTimeMode();renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
+function renderAll(){applyTheme();renderTimeMode();renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
 $('genreFilter').innerHTML+='<option value="all">Все жанры</option>';for(let [k,v] of Object.entries(GENRES))$('genreFilter').innerHTML+=`<option value="${k}">${v}</option>`;$('genreFilter').remove(1);
 function renderTimeMode(){$('timeMode').innerHTML=[['story','Сюжет'],['extra','С допами'],['all','100%']].map(([k,v])=>`<button class="${state.mode===k?'on':''}" onclick="setMode('${k}')">${v}</button>`).join('')}
 renderAll();
