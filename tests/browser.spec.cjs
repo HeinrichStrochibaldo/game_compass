@@ -40,6 +40,7 @@ test('startup and navigation',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.reload();
   await expect(page.locator('#stats .stat strong').first()).toHaveText('50');
+  await expect(page.locator('#stats')).toBeHidden();
   await expect(page.locator('#next .big')).not.toBeEmpty();
   for(const [name,id] of [['Каталог','catalog'],['История','history'],['Подбор','picker'],['Главная','home']]){
     await page.locator('nav').getByRole('button',{name}).click();
@@ -163,4 +164,19 @@ test('independent screens and top navigation',async({page})=>{
   }
   await expect(page.locator('header nav')).toBeVisible();
   await expect(page.locator('nav.bottom')).toHaveCount(0);
+});
+
+test('catalog layout persists and home reflects current game',async({page})=>{
+  await page.evaluate(()=>{const candidate=migrateData({...state,games:state.games.map((g,i)=>i===0?{...g,progress:'in_progress',historyGroup:null}:g)});persist(candidate);state=candidate;renderAll()});
+  await expect(page.locator('#currentGame .game')).toHaveCount(1);
+  await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
+  await page.getByRole('button',{name:'Сетка',exact:true}).click();
+  await expect(page.locator('#catalogList')).toHaveClass(/catalog-grid/);
+  await page.locator('#statusFilter').selectOption('in_progress');
+  await expect(page.locator('#catalogList .game')).toHaveCount(1);
+  await page.reload();
+  await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
+  await expect(page.locator('#catalogList')).toHaveClass(/catalog-grid/);
+  await page.getByRole('button',{name:'Список',exact:true}).click();
+  await expect(page.locator('#catalogList')).not.toHaveClass(/catalog-grid/);
 });

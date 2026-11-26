@@ -44,3 +44,5 @@ html:has(#overlay .modalbg),body:has(#overlay .modalbg){overflow:hidden;overscro
 
 /* Independent screens and top navigation. */
 .top-tabs{max-width:740px;margin:10px auto 0}.top-tabs .nav button{min-height:44px;font-size:13px;border-radius:0;border-bottom:2px solid transparent}.top-tabs .nav button.active{background:transparent;color:var(--accent);border-bottom-color:var(--accent)}main{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}.section[hidden]{display:none!important}
+
+.seg button.on{color:var(--selected-text)}#catalogLayout{margin:10px 0}.catalog-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.catalog-grid .game{display:flex;flex-direction:column;min-width:0;margin:0}.catalog-grid .game>.btn{align-self:stretch}.catalog-grid .game .main{width:100%}#latestGame{margin-top:18px}#history .stats{margin-bottom:14px}
