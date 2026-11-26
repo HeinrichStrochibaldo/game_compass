@@ -103,3 +103,27 @@ test('modal locks background and restores overflow',async({page})=>{
   await expect(page.locator('#overlay .modal')).toHaveCount(0);
   expect(await overflow()).toEqual(initial);
 });
+
+test('completion metadata and appearance survive migration and reload',async({page})=>{
+  const result=await page.evaluate(()=>{
+    const old={version:1,games:BASE,mode:'extra',quick:'all',moods:[],recent:[],historyNotes:''};
+    const migrated=migrateData(old);
+    const v2={...migrated,games:migrated.games.map(({actualHours,platform,...g})=>g)};
+    delete v2.theme;delete v2.catalogLayout;
+    const restored=migrateData(v2);
+    const candidate={...restored,theme:'dark',catalogLayout:'grid',games:restored.games.map((g,i)=>i===0?{...g,progress:'completed',historyGroup:'2027',date:'2027-01-02',actualHours:12.5,platform:'steam'}:g)};
+    persist(candidate);
+    return {count:restored.games.length,defaults:restored.games.every(g=>g.actualHours===null&&g.platform==='unknown'),theme:restored.theme,layout:restored.catalogLayout,unchanged:JSON.stringify(restored.games)===JSON.stringify(migrated.games)};
+  });
+  expect(result).toEqual({count:50,defaults:true,theme:'auto',layout:'list',unchanged:true});
+  await page.reload();
+  expect(await page.evaluate(()=>({theme:state.theme,layout:state.catalogLayout,hours:state.games[0].actualHours,platform:state.games[0].platform,group:state.games[0].historyGroup}))).toEqual({theme:'dark',layout:'grid',hours:12.5,platform:'steam',group:'2027'});
+});
+test('reject invalid completion and appearance metadata',async({page})=>{
+  expect(await page.evaluate(()=>{
+    const base=migrateData(state);
+    const cases=[{actualHours:-1},{actualHours:'12'},{actualHours:Infinity},{platform:'invalid'},{historyGroup:'bad'}].map(p=>({...base,games:base.games.map((g,i)=>i===0?{...g,...p}:g)}));
+    cases.push({...base,theme:'invalid'},{...base,catalogLayout:'invalid'});
+    return cases.every(c=>{try{migrateData(c);return false}catch{return true}});
+  })).toBe(true);
+});
