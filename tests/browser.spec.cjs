@@ -78,8 +78,11 @@ test('mood and randomizer',async({page})=>{
   await page.locator('nav').getByRole('button',{name:'Подбор'}).click();
   await page.locator('#moodTags').getByRole('button',{name:'Сюжет',exact:true}).click();
   await expect(page.locator('#moodTags').getByRole('button',{name:'Сюжет',exact:true})).toHaveClass(/\bon\b/);
-  await page.getByRole('button',{name:'Подобрать 3 игры'}).click();
-  await expect(page.locator('#pickerResult .game')).toHaveCount(3);
+  await page.getByRole('button',{name:'Подобрать игру'}).click();
+  await expect(page.locator('#pickerResult .game')).toHaveCount(1);
+  const first=await page.locator('#pickerResult .game').textContent();
+  await page.getByRole('button',{name:'Другой вариант'}).click();
+  expect(await page.locator('#pickerResult .game').textContent()).not.toBe(first);
   await page.getByRole('button',{name:'Рандомайзер'}).click();
   await expect(page.locator('#pickerResult .game')).toHaveCount(1);
 });
@@ -202,4 +205,14 @@ test('completion and unsaved edit protection',async({page})=>{
  await page.getByRole('button',{name:'Сохранить завершение'}).click();
  await page.reload();
  expect(await page.evaluate(()=>state.games.some(g=>g.progress==='completed'&&g.actualHours===12.5&&g.platform==='steam'&&g.date==='2026-11-26'))).toBe(true);
+});
+
+test('picker duration applies to recommendations and randomizer',async({page})=>{
+ await page.locator('nav').getByRole('button',{name:'Подбор'}).click();
+ await page.locator('#pickerDuration').selectOption('evening');
+ expect(await page.evaluate(()=>pool().every(g=>h(g)>0&&h(g)<=4))).toBe(true);
+ await page.locator('#pickerDuration').selectOption('long');
+ expect(await page.evaluate(()=>pool().every(g=>h(g)>12))).toBe(true);
+ await page.getByRole('button',{name:'Подобрать игру'}).click();
+ await expect(page.locator('#pickerResult .game')).toHaveCount(1);
 });

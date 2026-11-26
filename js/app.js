@@ -27,8 +27,17 @@ function renderHistory(){let known=lastPlayed(),years=['2026','2025','earlier'];
 function updateBudget(){$('budget').textContent=`≈${(+$('daily').value*+$('days').value).toFixed(1)} ч/неделю · ≈${Math.round(+$('daily').value*+$('days').value*4.33)} ч/месяц`}
 function renderMoods(){$('moodTags').innerHTML=MOODS.map(m=>`<button class="chip ${state.moods.includes(m)?'on':''}" onclick="toggleMood('${m}')">${esc(m)}</button>`).join('')}
 function toggleMood(m){const moods=state.moods.includes(m)?state.moods.filter(x=>x!==m):state.moods.length<5?[...state.moods,m]:state.moods;if(moods!==state.moods&&updateSettings({moods}))renderMoods()}
-function pool(){return state.games.filter(g=>(!$('ownedOnly').checked||owned(g))&&(!$('unplayedOnly').checked||!done(g))&&($('allowFuture').checked||!['oled','pc3'].includes(g.screen)))}
-function recommend(){let items=pool().sort((a,b)=>moodScore(b)-moodScore(a)).slice(0,3);$('pickerResult').innerHTML='<div class="divider"></div><h3>Три варианта</h3>'+items.map(g=>gameCard(g)).join('')+(items.length?'':'<div class="empty">Нет подходящих игр</div>')}
+function pool(){const duration=$('pickerDuration').value;return state.games.filter(g=>(duration==='all'||h(g)>0&&(duration==='evening'&&h(g)<=4||duration==='weekend'&&h(g)<=12||duration==='long'&&h(g)>12))&&(!$('ownedOnly').checked||owned(g))&&(!$('unplayedOnly').checked||!done(g))&&($('allowFuture').checked||!['oled','pc3'].includes(g.screen)))}
+let pickerSeen=new Set();
+function recommend(another=false){
+ if(!another)pickerSeen.clear();
+ const items=pool().sort((a,b)=>moodScore(b)-moodScore(a));
+ let g=items.find(x=>!pickerSeen.has(x.id));
+ if(!g&&items.length){pickerSeen.clear();g=items[0]}
+ if(!g){$('pickerResult').innerHTML='<div class="empty">Нет подходящих игр. Измени фильтры.</div>';return}
+ pickerSeen.add(g.id);
+ $('pickerResult').innerHTML='<div class="divider"></div><h3>Твой следующий вариант</h3>'+gameCard(g)+(items.length>1?'<button class="btn" onclick="recommend(true)">Другой вариант</button>':'');
+}
 function randomize(fromHome=false){let items=fromHome?recList().filter(x=>!['oled','pc3'].includes(x.g.screen)).map(x=>x.g):pool();if(!items.length){alert('Нет подходящих игр. Измени фильтры.');return}let bytes=new Uint32Array(1);crypto.getRandomValues(bytes);let g=items[bytes[0]%items.length];if(fromHome){openGame(g.id)}else $('pickerResult').innerHTML='<div class="divider"></div><div class="eyebrow">🎲 Случайный выбор</div>'+gameCard(g)}
 let draftSnapshot=null;
 function draftValues(){return JSON.stringify([...$('overlay').querySelectorAll('input,select,textarea')].map(el=>el.value))}
