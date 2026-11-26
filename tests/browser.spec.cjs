@@ -231,3 +231,12 @@ test('history supports future years and actual hours without changing historical
  await page.getByRole('button',{name:'Сохранить',exact:true}).click();
  expect(await page.evaluate(()=>state.games[0].historyGroup)).toBe('2027');
 });
+
+test('settings catalog layout persists',async({page})=>{
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await page.getByRole('group',{name:'Вид каталога в настройках'}).getByRole('button',{name:'Сетка'}).click();
+ expect(await page.evaluate(()=>state.catalogLayout)).toBe('grid');
+ await page.reload();
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await expect(page.getByRole('group',{name:'Вид каталога в настройках'}).getByRole('button',{name:'Сетка'})).toHaveAttribute('aria-pressed','true');
+});
