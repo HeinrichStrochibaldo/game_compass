@@ -53,3 +53,7 @@ jobs:
           echo LOCKFILE_BEGIN
           cat package-lock.json
           echo LOCKFILE_END
+          echo AUDIT_BEGIN
+          npm audit --json || true
+          echo AUDIT_END
+          npm view @playwright/test version
