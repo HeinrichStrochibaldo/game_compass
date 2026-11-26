@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm install --no-save --no-package-lock --ignore-scripts @playwright/test@1.51.1
+      - run: npm install --no-save --no-package-lock --ignore-scripts @playwright/test@1.65.1
       - run: npx --no-install playwright install --with-deps chromium webkit
       - run: npx --no-install playwright test --config=playwright.config.cjs
       - uses: actions/upload-artifact@v4
@@ -47,13 +47,13 @@ jobs:
         run: |
           mkdir -p /tmp/game-compass-lock
           cd /tmp/game-compass-lock
-          printf '%s\n' '{"name":"game-compass","version":"0.4.0","private":true,"devDependencies":{"@playwright/test":"1.51.1"}}' > package.json
+          printf '%s\n' '{"name":"game-compass","version":"0.4.0","private":true,"devDependencies":{"@playwright/test":"1.65.1"}}' > package.json
           npm install --package-lock-only --ignore-scripts
           npm ci --ignore-scripts
           echo LOCKFILE_BEGIN
           cat package-lock.json
           echo LOCKFILE_END
           echo AUDIT_BEGIN
-          npm audit --json || true
+          npm audit --json
           echo AUDIT_END
           npm view @playwright/test version
