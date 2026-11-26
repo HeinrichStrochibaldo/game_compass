@@ -78,3 +78,28 @@ test('mood and randomizer',async({page})=>{
   await page.getByRole('button',{name:'Рандомайзер'}).click();
   await expect(page.locator('#pickerResult .game')).toHaveCount(1);
 });
+
+test('mobile layout and touch targets',async({page},info)=>{
+  test.skip(info.project.name!=='webkit-mobile','Mobile layout only');
+  for(const width of [320,390,402,430]){
+    await page.setViewportSize({width,height:812});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    for(const button of await page.locator('nav button').all()){
+      const bounds=await button.boundingBox();
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.locator('#search').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
+  }
+});
+test('modal locks background and restores overflow',async({page})=>{
+  const overflow=()=>page.evaluate(()=>[getComputedStyle(document.documentElement).overflowY,getComputedStyle(document.body).overflowY]);
+  const initial=await overflow();
+  await page.getByRole('button',{name:'Настройки'}).click();
+  await expect(page.locator('#overlay .modal')).toBeVisible();
+  expect(await overflow()).toEqual(['hidden','hidden']);
+  expect(await page.locator('#overlay .modal').evaluate(el=>getComputedStyle(el).overscrollBehaviorY)).toBe('contain');
+  await page.evaluate(()=>closeModal());
+  await expect(page.locator('#overlay .modal')).toHaveCount(0);
+  expect(await overflow()).toEqual(initial);
+});

@@ -658,7 +658,7 @@ const SCREENS={tv:'Текущий ТВ 4K/60',monitor:'Монитор 1440p',ole
 const STATUS={2025:'Пройдена · 2025',2026:'Пройдена · 2026',earlier:'Пройдена ранее',unknown:'Не уточнён',unowned:'Не куплена'};
 const MOODS=['На один вечер','Сюжет','Без напряжения','Хочу экшен','Хочу испугаться','Большой мир','Сложный вызов','Гонки','Вдвоём','Кооператив','Продолжение серии','Сменить жанр','До OLED','На месяц'];
 // Validate legacy and current backups without changing the input.
-const APP_VERSION='0.4.0';
+const APP_VERSION='0.5.0';
 const DATA_VERSION=2;
 const PROGRESS=['unknown','not_started','in_progress','completed'];
 function legacyGame(g){
