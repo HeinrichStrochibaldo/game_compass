@@ -62,7 +62,7 @@ function watchDraft(){draftSnapshot=draftValues()}
 function openGame(id){
  draftSnapshot=null;
  const g=state.games.find(x=>x.id===id);if(!g)return;
- $('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal" role="dialog" aria-label="Карточка игры"><div class="grabber"></div><div class="row"><span class="eyebrow">${esc(GENRES[g.genre])}</span><button class="btn tiny" onclick="closeModal()" aria-label="Закрыть">✕</button></div><div class="big">${esc(g.name)}</div><div class="pills">${badge(g)}<span class="pill">${esc(SCREENS[g.screen])}</span></div><p class="desc">Оценка времени: ≈${h(g)||'?'} ч</p><p class="desc">Фактическое время: ${g.actualHours===null?'не указано':g.actualHours+' ч'}</p><p class="desc">${esc(performance(g))}</p><p class="desc">${esc(g.note||'Нет заметок')}</p><button class="btn primary" onclick="editGame(${id})">Редактировать</button>${!done(g)?`<button class="btn" onclick="startGame(${id})">Начать игру</button><button class="btn" onclick="completeGame(${id})">Завершить игру</button>`:''}</div></div>`;
+ $('overlay').innerHTML=`<div class="modalbg" onclick="if(event.target===this)closeModal()"><div class="modal" role="dialog" aria-label="Карточка игры"><div class="grabber"></div><div class="row"><span class="eyebrow">${esc(GENRES[g.genre])}</span><button class="btn tiny" onclick="closeModal()" aria-label="Закрыть">✕</button></div><div class="big">${esc(g.name)}</div><div class="pills">${badge(g)}<span class="pill">${esc(SCREENS[g.screen])}</span></div><div class="grid3"><div class="stat"><strong>${g.hours?Math.round(g.hours*.65):"?"}</strong><span>Сюжет · ч</span></div><div class="stat"><strong>${g.hours||"?"}</strong><span>С допами · ч</span></div><div class="stat"><strong>${g.hours?Math.round(g.hours*1.8):"?"}</strong><span>100% · ч</span></div></div><p class="hint">Ориентировочные оценки, не измеренное время.</p><p class="desc">Владение: ${g.owned==="yes"?"Есть доступ":!owned(g)?"Не куплена":"Не уточнено"} · ${g.control==="pad"?"Геймпад":"Клавиатура и мышь"}</p><p class="desc">Платформа: ${esc(({steam:"Steam",playstation:"PlayStation",other:"Другая",unknown:"Не указана"})[g.platform])}</p><p class="desc">Фактическое время: ${g.actualHours===null?'не указано':g.actualHours+' ч'}</p><p class="desc">${esc(performance(g))}</p><p class="desc">${esc(g.note||'Нет заметок')}</p><button class="btn primary" onclick="editGame(${id})">Редактировать</button>${!done(g)?`<button class="btn" onclick="startGame(${id})">Начать игру</button><button class="btn" onclick="completeGame(${id})">Завершить игру</button>`:''}</div></div>`;
 }
 function startGame(id){if(updateSettings({games:state.games.map(g=>g.id===id&&!done(g)?{...g,progress:'in_progress',historyGroup:null}:g)})){renderAll();openGame(id)}}
 function completeGame(id){
@@ -129,7 +129,7 @@ let swipeStart=null;
 const screenArea=document.querySelector('main');
 screenArea.addEventListener('touchstart',event=>{
   swipeStart=null;
-  if(event.touches.length!==1||event.target.closest('button,input,select,textarea,a,.chips,.seg,.check')||$('overlay').children.length)return;
+  if(event.touches.length!==1||event.target.closest('button:not(.game-link),input,select,textarea,a,.chips,.seg,.check')||$('overlay').children.length)return;
   const t=event.touches[0];swipeStart={x:t.clientX,y:t.clientY};
 },{passive:true});
 screenArea.addEventListener('touchcancel',()=>{swipeStart=null},{passive:true});
@@ -138,8 +138,8 @@ screenArea.addEventListener('touchend',event=>{
   if(!start||event.touches.length||event.changedTouches.length!==1)return;
   const t=event.changedTouches[0],dx=t.clientX-start.x,dy=t.clientY-start.y;
   if(Math.abs(dx)<65||Math.abs(dx)<Math.abs(dy)*1.5)return;
-  const id=screens[screens.indexOf(activeScreen)+(dx<0?1:-1)];if(id)go(id);
-},{passive:true});
+  const id=screens[screens.indexOf(activeScreen)+(dx<0?1:-1)];if(id){event.preventDefault();go(id)}
+},{passive:false});
 function renderAll(){applyTheme();renderTimeMode();renderHome();renderCatalog();renderHistory();renderMoods();updateBudget()}
 $('genreFilter').innerHTML+='<option value="all">Все жанры</option>';for(let [k,v] of Object.entries(GENRES))$('genreFilter').innerHTML+=`<option value="${k}">${v}</option>`;$('genreFilter').remove(1);
 function renderTimeMode(){$('timeMode').innerHTML=[['story','Сюжет'],['extra','С допами'],['all','100%']].map(([k,v])=>`<button class="${state.mode===k?'on':''}" onclick="setMode('${k}')">${v}</button>`).join('')}

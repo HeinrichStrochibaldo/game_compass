@@ -249,3 +249,13 @@ test('audit: version, status labels and theme color',async({page})=>{
  await page.getByRole('button',{name:'Светлая',exact:true}).click();
  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#f2f2f7');
 });
+
+test('horizontal swipe on game card navigates without opening it',async({page})=>{
+ await page.locator('nav').getByRole('button',{name:'Каталог'}).click();
+ await page.locator('#catalogList .game-link').first().evaluate(el=>{
+ const event=(type,x)=>{const e=new Event(type,{bubbles:true,cancelable:true});Object.defineProperties(e,{touches:{value:type==='touchstart'?[{clientX:x,clientY:100}]:[]},changedTouches:{value:[{clientX:x,clientY:100}]}});el.dispatchEvent(e)};
+ event('touchstart',220);event('touchend',80);
+ });
+ await expect(page.locator('#history')).toBeVisible();
+ await expect(page.locator('#overlay .modal')).toHaveCount(0);
+});

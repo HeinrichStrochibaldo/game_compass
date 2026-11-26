@@ -56,3 +56,5 @@ html:has(#overlay .modalbg),body:has(#overlay .modalbg){overflow:hidden;overscro
 .history-entry{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--fg);padding:10px 0;min-height:44px;overflow-wrap:anywhere}.history-entry strong,.history-entry span{display:block}.history-entry span{margin-top:5px}#historyHours .stat strong{font-size:18px}#historyYear{margin-bottom:10px}
 
 .settings-sheet h3{font-size:13px;color:var(--muted);margin:20px 4px 7px}.settings-group{border:1px solid var(--line);border-radius:14px;padding:12px}.settings-row{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;padding:12px 0;color:inherit;text-decoration:none}.settings-row+.settings-row{border-top:1px solid var(--line)}.settings-row span{color:var(--muted);font-size:13px}.settings-sheet .seg button{min-height:44px}
+
+.game-link{touch-action:pan-y}.game-link:focus-visible,.history-entry:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
