@@ -274,3 +274,16 @@ test('rollback snapshot preserves exact prior bytes across writes',async({page})
  await page.getByRole('button',{name:'Настройки'}).click();
  await expect(page.getByRole('button',{name:'Скачать снимок до обновления'})).toBeVisible();
 });
+
+test('edit completion metadata and preserve unknown hours',async({page})=>{
+ await page.evaluate(()=>editGame(state.games[0].id));
+ await page.locator('#editHours').fill('12.5');
+ await page.locator('#editPlatform').selectOption('steam');
+ await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await page.reload();
+ expect(await page.evaluate(()=>[state.games[0].actualHours,state.games[0].platform])).toEqual([12.5,'steam']);
+ await page.evaluate(()=>editGame(state.games[0].id));
+ await page.locator('#editHours').fill('');
+ await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ expect(await page.evaluate(()=>state.games[0].actualHours)).toBeNull();
+});
