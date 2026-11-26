@@ -5,11 +5,11 @@ const fs=require('node:fs');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
 const paths=[...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m=>m[1]);
 const script=paths.map(p=>fs.readFileSync(require('node:path').join(__dirname,'..',p),'utf8')).join('\n');
-const core=script.slice(script.indexOf('const BASE='),script.indexOf('let limit='));
-const save=script.slice(script.indexOf('function save()'),script.indexOf('function done('));
+const core=script.slice(script.indexOf('const BASE='),script.indexOf('const Recommendation='));
+const save=script.slice(script.indexOf('function save()'),script.indexOf('const {done,owned,performance}'));
 const importer=script.slice(script.indexOf('async function importJSON('),script.indexOf('function resetData('));
 const editor=script.slice(script.indexOf('function saveGame('),script.indexOf('function closeModal('));
-const mood=script.slice(script.indexOf('function toggleMood('),script.indexOf('function moodScore('));
+const mood=script.slice(script.indexOf('function toggleMood('),script.indexOf('function pool('));
 function boot(raw=null,{readError=false,writeError=false,accept=true,fields={}}={}){
   let stored=raw,writes=0,alerts=[],renders=0;
   const storage={getItem(){if(readError)throw Error('read');return stored},setItem(k,v){if(writeError)throw Error('quota');stored=v;writes++}};
