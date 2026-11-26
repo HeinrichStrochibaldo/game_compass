@@ -184,3 +184,22 @@ test('catalog layout persists and home reflects current game',async({page})=>{
   await page.getByRole('button',{name:'Список',exact:true}).click();
   await expect(page.locator('#catalogList')).not.toHaveClass(/catalog-grid/);
 });
+
+test('completion and unsaved edit protection',async({page})=>{
+ await page.evaluate(()=>openGame(state.games.find(g=>!done(g)).id));
+ await page.getByRole('button',{name:'Редактировать',exact:true}).click();
+ await page.locator('#editNote').fill('unsaved');
+ page.once('dialog',d=>d.dismiss());
+ await page.getByRole('button',{name:'Отмена',exact:true}).click();
+ await expect(page.locator('#editNote')).toHaveValue('unsaved');
+ page.once('dialog',d=>d.accept());
+ await page.getByRole('button',{name:'Отмена',exact:true}).click();
+ await page.evaluate(()=>openGame(state.games.find(g=>!done(g)).id));
+ await page.getByRole('button',{name:'Завершить игру',exact:true}).click();
+ await page.locator('#finishHours').fill('12.5');
+ await page.locator('#finishPlatform').selectOption('steam');
+ await page.locator('#finishDate').fill('2026-11-26');
+ await page.getByRole('button',{name:'Сохранить завершение'}).click();
+ await page.reload();
+ expect(await page.evaluate(()=>state.games.some(g=>g.progress==='completed'&&g.actualHours===12.5&&g.platform==='steam'&&g.date==='2026-11-26'))).toBe(true);
+});
