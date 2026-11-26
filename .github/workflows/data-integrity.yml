@@ -35,3 +35,21 @@ jobs:
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
+  lockfile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate and verify dependency lock
+        run: |
+          mkdir -p /tmp/game-compass-lock
+          cd /tmp/game-compass-lock
+          printf '%s\n' '{"name":"game-compass","version":"0.4.0","private":true,"devDependencies":{"@playwright/test":"1.51.1"}}' > package.json
+          npm install --package-lock-only --ignore-scripts
+          npm ci --ignore-scripts
+          echo LOCKFILE_BEGIN
+          cat package-lock.json
+          echo LOCKFILE_END
