@@ -240,3 +240,12 @@ test('settings catalog layout persists',async({page})=>{
  await page.getByRole('button',{name:'Настройки'}).click();
  await expect(page.getByRole('group',{name:'Вид каталога в настройках'}).getByRole('button',{name:'Сетка'})).toHaveAttribute('aria-pressed','true');
 });
+
+test('audit: version, status labels and theme color',async({page})=>{
+ expect(await page.evaluate(()=>APP_VERSION)).toBe('0.5.1');
+ expect(await page.evaluate(()=>badge({...state.games[0],progress:'in_progress'}))).toContain('В процессе');
+ expect(await page.evaluate(()=>badge({...state.games[0],progress:'not_started'}))).toContain('Не начата');
+ await page.getByRole('button',{name:'Настройки'}).click();
+ await page.getByRole('button',{name:'Светлая',exact:true}).click();
+ await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content','#f2f2f7');
+});
