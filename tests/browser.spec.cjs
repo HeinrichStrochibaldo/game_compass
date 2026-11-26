@@ -216,3 +216,18 @@ test('picker duration applies to recommendations and randomizer',async({page})=>
  await page.getByRole('button',{name:'Подобрать игру'}).click();
  await expect(page.locator('#pickerResult .game')).toHaveCount(1);
 });
+
+test('history supports future years and actual hours without changing historical dates',async({page})=>{
+ await page.evaluate(()=>{const candidate=migrateData({...state,games:state.games.map((g,i)=>i===0?{...g,progress:'completed',historyGroup:'2027',date:'2027-01-02',actualHours:12.5,platform:'steam'}:g)});persist(candidate);state=candidate;renderAll()});
+ await page.locator('nav').getByRole('button',{name:'История'}).click();
+ await page.locator('#historyYear').selectOption('2027');
+ await expect(page.locator('#historyList .history-entry')).toHaveCount(1);
+ await expect(page.locator('#historyList')).toContainText('12.5 ч');
+ await expect(page.locator('#historyList')).toContainText('Steam');
+ await expect(page.locator('#historyList')).not.toContainText('порядок #');
+ await page.locator('#historyList .history-entry').click();
+ await page.getByRole('button',{name:'Редактировать',exact:true}).click();
+ await expect(page.locator('#editStatus')).toHaveValue('2027');
+ await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ expect(await page.evaluate(()=>state.games[0].historyGroup)).toBe('2027');
+});

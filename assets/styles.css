@@ -52,3 +52,5 @@ html:has(#overlay .modalbg),body:has(#overlay .modalbg){overflow:hidden;overscro
 .grabber{width:64px;height:24px;background:transparent;position:relative;touch-action:none;margin:0 auto 4px}.grabber:after{content:'';position:absolute;top:9px;left:14px;width:36px;height:5px;border-radius:5px;background:var(--muted)}.modal textarea{min-height:88px;font:inherit}
 
 .mood-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.mood-tiles .chip{white-space:normal;min-height:44px;border-radius:12px}.picker-advanced{margin:14px 0}.picker-advanced summary{cursor:pointer;color:var(--accent);padding:12px 0}#pickerResult .game{margin-top:10px}
+
+.history-entry{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--fg);padding:10px 0;min-height:44px;overflow-wrap:anywhere}.history-entry strong,.history-entry span{display:block}.history-entry span{margin-top:5px}#historyHours .stat strong{font-size:18px}#historyYear{margin-bottom:10px}
