@@ -660,11 +660,14 @@ const MOODS=['На один вечер','Сюжет','Без напряжени�
 // Validate legacy and current backups without changing the input.
 const APP_VERSION='0.5.0';
 const DATA_VERSION=2;
+const PLATFORMS=['unknown','steam','playstation','other'];
+const THEMES=['auto','light','dark'];
+const CATALOG_LAYOUTS=['list','grid'];
 const PROGRESS=['unknown','not_started','in_progress','completed'];
 function legacyGame(g){
   if(!g||typeof g!=='object'||typeof g.status!=='string'||!Object.hasOwn(STATUS,g.status))throw new Error('Некорректное поле: status');
   const {status,...rest}=g;
-  return {...rest,progress:['2025','2026','earlier'].includes(status)?'completed':'unknown',historyGroup:['2025','2026','earlier'].includes(status)?status:null,owned:g.owned,legacyUnowned:status==='unowned',kind:'unknown',parentId:null,steamAppId:null};
+  return {...rest,progress:['2025','2026','earlier'].includes(status)?'completed':'unknown',historyGroup:['2025','2026','earlier'].includes(status)?status:null,owned:g.owned,legacyUnowned:status==='unowned',kind:'unknown',parentId:null,steamAppId:null,actualHours:null,platform:'unknown'};
 }
 function displayStatus(g){return g.progress==='completed'?(g.historyGroup??'earlier'):g.owned==='no'||(g.owned==='unknown'&&g.legacyUnowned)?'unowned':'unknown'}
 function migrateData(raw){
@@ -688,7 +691,7 @@ function validateData(v){
     ids.add(g.id);
     if(typeof g.name!=='string'||!g.name.trim())fail('name');
     if(!PROGRESS.includes(g.progress))fail('progress');
-    if(![null,'2025','2026','earlier'].includes(g.historyGroup))fail('historyGroup');
+    if(!(g.historyGroup===null||g.historyGroup==='earlier'||(typeof g.historyGroup==='string'&&/^[1-9]\d{3}$/.test(g.historyGroup))))fail('historyGroup');
     if(g.progress!=='completed'&&g.historyGroup!==null)fail('historyGroup');
     if(typeof g.legacyUnowned!=='boolean')fail('legacyUnowned');
     if(!['unknown','base','dlc','standalone'].includes(g.kind))fail('kind');
@@ -704,7 +707,9 @@ function validateData(v){
     if(g.order!==null&&(!Number.isSafeInteger(g.order)||g.order<1))fail('order');
     if(g.note!==undefined&&typeof g.note!=='string')fail('note');
     if(g.parentId!==null&&g.kind!=='dlc')fail('parentId');
-    return {...g,note:g.note??''};
+    if(g.actualHours!==undefined&&g.actualHours!==null&&(!Number.isFinite(g.actualHours)||g.actualHours<0))fail('actualHours');
+    if(g.platform!==undefined&&!PLATFORMS.includes(g.platform))fail('platform');
+    return {...g,note:g.note??'',actualHours:g.actualHours??null,platform:g.platform??'unknown'};
   });
   const byId=new Map(games.map(g=>[g.id,g]));
   const steamIds=new Set();
@@ -716,7 +721,9 @@ function validateData(v){
   if(!one(v.quick,['all','short','switch','series','oled','pc3','cozy']))fail('quick');
   if(!Array.isArray(v.moods)||v.moods.length>5||!v.moods.every(m=>MOODS.includes(m))||new Set(v.moods).size!==v.moods.length)fail('moods');
   if(!Array.isArray(v.recent)||typeof v.historyNotes!=='string')fail('settings');
-  return {version:DATA_VERSION,games,mode:v.mode,quick:v.quick,moods:[...v.moods],recent:[...v.recent],historyNotes:v.historyNotes};
+  if(v.theme!==undefined&&!THEMES.includes(v.theme))fail('theme');
+  if(v.catalogLayout!==undefined&&!CATALOG_LAYOUTS.includes(v.catalogLayout))fail('catalogLayout');
+  return {version:DATA_VERSION,games,theme:v.theme??'auto',catalogLayout:v.catalogLayout??'list',mode:v.mode,quick:v.quick,moods:[...v.moods],recent:[...v.recent],historyNotes:v.historyNotes};
 }
 // Existing records take precedence over the bundled catalog.
 function mergeCatalog(games,base=BASE.map(legacyGame)){
