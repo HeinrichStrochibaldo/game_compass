@@ -1,5 +1,29 @@
 const {test,expect}=require('@playwright/test');
-test.beforeEach(async({page})=>{await page.goto('/');});
+const coverage=new Map();
+test.beforeEach(async({page,browserName})=>{
+  if(browserName==='chromium') await page.coverage.startJSCoverage({resetOnNavigation:false});
+  await page.goto('/');
+});
+test.afterEach(async({page,browserName})=>{
+  if(browserName!=='chromium')return;
+  for(const entry of await page.coverage.stopJSCoverage()){
+    const path=new URL(entry.url).pathname;
+    if(!/^\/js\/[^/]+\.js$/.test(path))continue;
+    if(!coverage.has(path))coverage.set(path,{length:entry.source.length,ranges:[]});
+    coverage.get(path).ranges.push(...entry.ranges);
+  }
+});
+test.afterAll(()=>{
+  for(const [path,{length,ranges}] of coverage){
+    let end=0,covered=0;
+    for(const r of ranges.sort((a,b)=>a.start-b.start)){
+      covered+=Math.max(0,r.end-Math.max(end,r.start));
+      end=Math.max(end,r.end);
+    }
+    console.log('JS coverage '+path+': '+(100*covered/length).toFixed(2)+'% ('+covered+'/'+length+' source characters)');
+  }
+});
+
 test('startup and navigation',async({page})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.reload();
